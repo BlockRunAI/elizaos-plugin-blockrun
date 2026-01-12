@@ -1,0 +1,68 @@
+{
+  "name": "@elizaos/plugin-blockrun",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "description": "BlockRun x402 pay-per-request AI plugin for ElizaOS - enables agents to make micropayments for AI API calls on Base",
+  "keywords": [
+    "elizaos",
+    "plugin",
+    "blockrun",
+    "x402",
+    "micropayments",
+    "ai",
+    "base",
+    "usdc"
+  ],
+  "author": "BlockRun <hello@blockrun.ai>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blockrunai/elizaos-plugin-blockrun"
+  },
+  "homepage": "https://blockrun.ai",
+  "bugs": {
+    "url": "https://github.com/blockrunai/elizaos-plugin-blockrun/issues"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@blockrun/llm": "^0.2.0",
+    "viem": "^2.21.0"
+  },
+  "peerDependencies": {
+    "@elizaos/core": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@elizaos/core": "^1.0.0",
+    "@types/node": "^22.10.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist node_modules",
+    "prepublishOnly": "npm run build",
+    "test": "bun test",
+    "test:e2e": "bun run test-e2e.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
