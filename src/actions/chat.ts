@@ -39,11 +39,11 @@ function getClient(runtime: IAgentRuntime): LLMClient {
     );
   }
 
-  const apiUrl = runtime.getSetting('BLOCKRUN_API_URL') || 'https://blockrun.ai/api';
+  const apiUrl = runtime.getSetting('BLOCKRUN_API_URL') as string | undefined || 'https://blockrun.ai/api';
 
   const client = new LLMClient({
     privateKey: privateKey as `0x${string}`,
-    apiUrl,
+    apiUrl: apiUrl as string,
   });
 
   clientCache.set(agentId, client);
@@ -85,7 +85,7 @@ export const blockrunChatAction: Action = {
   handler: async (
     runtime: IAgentRuntime,
     message: Memory,
-    state?: State,
+    _state?: State,
     options?: HandlerOptions,
     callback?: HandlerCallback
   ): Promise<ActionResult> => {
@@ -106,8 +106,8 @@ export const blockrunChatAction: Action = {
       }
 
       // Get model from options or use default
-      const model = (options as Record<string, unknown>)?.model as string ||
-        runtime.getSetting('BLOCKRUN_DEFAULT_MODEL') ||
+      const model = ((options as Record<string, unknown>)?.model as string) ||
+        (runtime.getSetting('BLOCKRUN_DEFAULT_MODEL') as string) ||
         'openai/gpt-4o-mini';
 
       // Get system prompt from character or options

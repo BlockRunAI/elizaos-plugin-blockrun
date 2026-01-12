@@ -64,7 +64,7 @@ export const blockrunWalletProvider: Provider = {
           abi: ERC20_ABI,
           functionName: 'balanceOf',
           args: [address],
-        });
+        }) as bigint;
         usdcBalance = formatUnits(usdcBalanceRaw, 6); // USDC has 6 decimals
       } catch {
         // Balance check failed, continue with 0

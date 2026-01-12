@@ -1,5 +1,5 @@
 {
-  "name": "@elizaos/plugin-blockrun",
+  "name": "@blockrun/elizaos-plugin",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
@@ -42,7 +42,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@blockrun/llm": "^0.2.0",
+    "@blockrun/llm": "^0.1.1",
     "viem": "^2.21.0"
   },
   "peerDependencies": {
