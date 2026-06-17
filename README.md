@@ -1,4 +1,4 @@
-# @elizaos/plugin-blockrun
+# @blockrun/elizaos-plugin
 
 Pay-per-request AI for ElizaOS agents via x402 micropayments on Base.
 
@@ -15,9 +15,9 @@ This plugin enables ElizaOS agents to make LLM API calls using the [x402 protoco
 ## Installation
 
 ```bash
-npm install @elizaos/plugin-blockrun
+npm install @blockrun/elizaos-plugin
 # or
-pnpm add @elizaos/plugin-blockrun
+pnpm add @blockrun/elizaos-plugin
 ```
 
 ## Configuration
@@ -44,7 +44,7 @@ const agent = new Agent({
 ### Plugin Registration
 
 ```typescript
-import { blockrunPlugin } from '@elizaos/plugin-blockrun';
+import { blockrunPlugin } from '@blockrun/elizaos-plugin';
 
 const agent = new Agent({
   plugins: [blockrunPlugin],
@@ -90,6 +90,12 @@ All payments use USDC on Base chain. Typical cost: $0.001-0.01 per request.
 | `BASE_CHAIN_WALLET_KEY` | Private key for Base chain wallet | Yes |
 | `BLOCKRUN_API_URL` | Custom API URL (default: https://blockrun.ai/api) | No |
 | `BLOCKRUN_DEFAULT_MODEL` | Default model (default: openai/gpt-4o-mini) | No |
+
+## Documentation
+
+Full docs: **https://blockrun.ai/docs**
+
+- ElizaOS integration guide: https://blockrun.ai/docs/frameworks/elizaos
 
 ## Links
 

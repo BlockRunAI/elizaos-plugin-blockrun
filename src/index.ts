@@ -1,5 +1,5 @@
 /**
- * @elizaos/plugin-blockrun
+ * @blockrun/elizaos-plugin
  *
  * BlockRun x402 pay-per-request AI plugin for ElizaOS.
  *
@@ -17,7 +17,7 @@
  *
  * @example
  * ```typescript
- * import { blockrunPlugin } from '@elizaos/plugin-blockrun';
+ * import { blockrunPlugin } from '@blockrun/elizaos-plugin';
  *
  * const agent = new Agent({
  *   plugins: [blockrunPlugin],

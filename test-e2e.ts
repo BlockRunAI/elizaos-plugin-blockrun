@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Standalone E2E test for @elizaos/plugin-blockrun
+ * Standalone E2E test for @blockrun/elizaos-plugin
  *
  * Run with: bun run test-e2e.ts
  * Requires: BASE_CHAIN_WALLET_KEY environment variable
