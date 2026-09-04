@@ -1,10 +1,10 @@
 # @blockrun/elizaos-plugin
 
-Pay-per-request AI for ElizaOS agents via x402 micropayments on Base.
+AI for ElizaOS agents through a BlockRun account API key or x402 USDC on Solana and Base.
 
 ## Overview
 
-This plugin enables ElizaOS agents to make LLM API calls using the [x402 protocol](https://x402.org), paying with USDC micropayments on Base chain. No API keys required - just a wallet with USDC.
+Use one BlockRun account API key across hosted models and product APIs, or keep pay-per-request wallet billing through the [x402 protocol](https://x402.org). Account billing is selected first, followed by Solana and then Base when more than one credential is configured.
 
 **Supported Models:**
 - OpenAI: gpt-4o, gpt-4o-mini
@@ -20,7 +20,31 @@ npm install @blockrun/elizaos-plugin
 pnpm add @blockrun/elizaos-plugin
 ```
 
-## Configuration
+## Create an account API key
+
+1. Register or sign in at [user.blockrun.ai](https://user.blockrun.ai).
+2. Create a key in [Dashboard → Keys](https://user.blockrun.ai/dashboard/keys).
+3. Add credits in [Dashboard → Credits](https://user.blockrun.ai/dashboard/credits).
+
+```env
+BLOCKRUN_API_KEY=brk_...
+# Optional; the default is https://api.blockrun.ai
+BLOCKRUN_API_BASE_URL=https://api.blockrun.ai
+```
+
+The account path uses bearer authentication and does not create or read a wallet.
+
+## Wallet configuration
+
+### Solana (preferred wallet path)
+
+```env
+SOLANA_WALLET_KEY=your_base58_secret_key
+# Optional; the default is https://sol.blockrun.ai/api
+BLOCKRUN_SOLANA_API_URL=https://sol.blockrun.ai/api
+```
+
+### Base fallback
 
 Set your Base chain wallet private key:
 
@@ -34,7 +58,7 @@ Or in agent settings:
 const agent = new Agent({
   plugins: [blockrunPlugin],
   settings: {
-    BASE_CHAIN_WALLET_KEY: '0x...',
+    BLOCKRUN_API_KEY: 'brk_...',
   },
 });
 ```
@@ -66,29 +90,32 @@ Make a pay-per-request AI call:
 
 #### BLOCKRUN_WALLET
 
-Provides wallet context to the agent:
+Provides account or wallet billing context to the agent:
 
 ```typescript
-// Returns wallet address and USDC balance on Base
-// Useful for agents to understand their payment capacity
+// Account mode reports key/credits management links.
+// Wallet mode reports Solana identity or Base balances.
 ```
 
 ## How It Works
 
-1. Agent makes an AI request via BLOCKRUN_CHAT action
-2. BlockRun gateway returns 402 Payment Required with price
-3. Plugin automatically signs USDC payment (EIP-712)
-4. Request is retried with payment signature
-5. AI response is returned to the agent
+1. The plugin checks for `BLOCKRUN_API_KEY`, then Solana, then Base credentials.
+2. Account requests go to `https://api.blockrun.ai/v1` with bearer authentication.
+3. Wallet requests receive an x402 quote and sign the required USDC payment locally.
+4. The AI response is returned to the agent with its active billing mode.
 
-All payments use USDC on Base chain. Typical cost: $0.001-0.01 per request.
+Account charges appear in the BlockRun portal. Wallet payments use USDC on the selected chain.
 
 ## Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `BASE_CHAIN_WALLET_KEY` | Private key for Base chain wallet | Yes |
-| `BLOCKRUN_API_URL` | Custom API URL (default: https://blockrun.ai/api) | No |
+| `BLOCKRUN_API_KEY` | Account API key from the BlockRun portal | One credential required |
+| `BLOCKRUN_API_BASE_URL` | Account API origin (default: `https://api.blockrun.ai`) | No |
+| `SOLANA_WALLET_KEY` | Base58 Solana wallet secret key | One credential required |
+| `BLOCKRUN_SOLANA_API_URL` | Solana gateway URL (default: `https://sol.blockrun.ai/api`) | No |
+| `BASE_CHAIN_WALLET_KEY` | Base wallet private key | One credential required |
+| `BLOCKRUN_API_URL` | Base gateway URL (default: `https://blockrun.ai/api`) | No |
 | `BLOCKRUN_DEFAULT_MODEL` | Default model (default: openai/gpt-4o-mini) | No |
 
 ## Documentation

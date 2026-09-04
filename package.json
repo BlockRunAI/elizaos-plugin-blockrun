@@ -1,11 +1,11 @@
 {
   "name": "@blockrun/elizaos-plugin",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
-  "description": "BlockRun x402 pay-per-request AI plugin for ElizaOS - enables agents to make micropayments for AI API calls on Base",
+  "description": "BlockRun account API and x402 pay-per-request AI plugin for ElizaOS",
   "keywords": [
     "elizaos",
     "plugin",
@@ -13,6 +13,7 @@
     "x402",
     "micropayments",
     "ai",
+    "solana",
     "base",
     "usdc"
   ],
@@ -42,7 +43,9 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@blockrun/llm": "^0.1.1",
+    "@blockrun/llm": "^3.13.6",
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.98.4",
     "viem": "^2.21.0"
   },
   "peerDependencies": {
@@ -59,7 +62,7 @@
     "dev": "tsup --watch",
     "clean": "rm -rf dist node_modules",
     "prepublishOnly": "npm run build",
-    "test": "bun test",
+    "test": "node --test test/*.test.mjs",
     "test:e2e": "bun run test-e2e.ts"
   },
   "publishConfig": {
