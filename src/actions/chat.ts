@@ -26,7 +26,7 @@ class AccountChatClient {
   constructor(private readonly apiKey: string, apiUrl?: string) {
     const base = (apiUrl || 'https://api.blockrun.ai').replace(/\/+$/, '').replace(/\/v1$/, '');
     const parsed = new URL(base);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== "/") {
       throw new Error('BLOCKRUN_API_BASE_URL must be a credential-free HTTPS origin.');
     }
     this.baseUrl = base;
@@ -39,6 +39,7 @@ class AccountChatClient {
     const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
       method: 'POST',
       redirect: 'error',
+      signal: AbortSignal.timeout(120_000),
       headers: {
         authorization: `Bearer ${this.apiKey}`,
         'content-type': 'application/json',
@@ -50,15 +51,14 @@ class AccountChatClient {
         temperature: options?.temperature,
       }),
     });
-    const body = await response.json() as {
-      choices?: Array<{ message?: { content?: string } }>;
-      error?: { message?: string } | string;
-    };
     if (!response.ok) {
-      const rawMessage = typeof body.error === 'string' ? body.error : body.error?.message;
-      const message = rawMessage?.split(this.apiKey).join('[REDACTED]');
-      throw new Error(`BlockRun account API error ${response.status}${message ? `: ${message}` : ''}`);
+      const raw = (await response.text()).split(this.apiKey).join('[REDACTED]').slice(0, 500);
+      const hint = response.status === 402 ? ' Add credits at https://user.blockrun.ai/dashboard/credits.' : '';
+      throw new Error(`BlockRun account API error ${response.status}.${hint} ${raw}`);
     }
+    const body = await response.json().catch(() => {
+      throw new Error('BlockRun account API returned invalid JSON.');
+    }) as { choices?: Array<{ message?: { content?: string } }> };
     const content = body.choices?.[0]?.message?.content;
     if (typeof content !== 'string') throw new Error('BlockRun account API returned no assistant content.');
     return content;

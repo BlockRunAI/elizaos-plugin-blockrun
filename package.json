@@ -63,7 +63,8 @@
     "clean": "rm -rf dist node_modules",
     "prepublishOnly": "npm run build",
     "test": "node --test test/*.test.mjs",
-    "test:e2e": "bun run test-e2e.ts"
+    "test:e2e": "bun run test-e2e.ts",
+    "test:account-live": "node test/account-live.mjs"
   },
   "publishConfig": {
     "access": "public"

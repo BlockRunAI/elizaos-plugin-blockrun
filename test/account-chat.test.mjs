@@ -52,3 +52,23 @@ test('billing provider selects Solana before Base and derives its address locall
   assert.equal(result.data.address, keypair.publicKey.toBase58());
   assert.equal(result.values.billingMode, 'Solana x402');
 });
+
+test('account credit errors are sanitized and never replayed as wallet payments', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  let calls = 0;
+  globalThis.fetch = async (_url, init) => {
+    calls++;
+    assert.equal(init.redirect, 'error');
+    assert.ok(init.signal instanceof AbortSignal);
+    return new Response('Rejected brk_test_fixture', {status:402});
+  };
+  const settings = {BLOCKRUN_API_KEY:'brk_test_fixture', BASE_CHAIN_WALLET_KEY:'not-a-wallet'};
+  const runtime = {agentId:'test-agent',character:{},getSetting:name=>settings[name]};
+  const result = await blockrunChatAction.handler(runtime,{content:{text:'hello'}});
+  assert.equal(result.success,false);
+  assert.match(result.text,/402/);
+  assert.match(result.text,/dashboard\/credits/);
+  assert.ok(!result.text.includes(settings.BLOCKRUN_API_KEY));
+  assert.equal(calls,1);
+});
