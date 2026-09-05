@@ -2,6 +2,8 @@ import type { IAgentRuntime, Memory, Provider } from '@elizaos/core';
 import { privateKeyToAccount } from 'viem/accounts';
 import { createPublicClient, http, formatUnits } from 'viem';
 import { base } from 'viem/chains';
+import { SolanaLLMClient } from '@blockrun/llm';
+import { resolveBlockRunBilling } from '../auth';
 
 // USDC contract on Base
 const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const;
@@ -18,7 +20,7 @@ const ERC20_ABI = [
 ] as const;
 
 /**
- * BlockRun Wallet Provider - Provides wallet address and USDC balance on Base.
+ * BlockRun billing provider - reports account or wallet configuration.
  *
  * This provider gives the agent context about its payment wallet,
  * including address and available USDC balance for x402 micropayments.
@@ -27,12 +29,8 @@ export const blockrunWalletProvider: Provider = {
   name: 'BLOCKRUN_WALLET',
   get: async (runtime: IAgentRuntime, _message: Memory) => {
     try {
-      // Get private key from settings
-      const privateKey = runtime.getSetting('BASE_CHAIN_WALLET_KEY') ||
-        runtime.getSetting('BLOCKRUN_WALLET_KEY') ||
-        process.env.BASE_CHAIN_WALLET_KEY;
-
-      if (!privateKey) {
+      const billing = resolveBlockRunBilling(runtime);
+      if (billing.mode === 'none') {
         return {
           data: {
             configured: false,
@@ -40,9 +38,48 @@ export const blockrunWalletProvider: Provider = {
           values: {
             walletConfigured: 'false',
           },
-          text: 'BlockRun wallet is not configured. Set BASE_CHAIN_WALLET_KEY to enable x402 micropayments.',
+          text: 'BlockRun is not configured. Set BLOCKRUN_API_KEY, SOLANA_WALLET_KEY, or BASE_CHAIN_WALLET_KEY.',
         };
       }
+
+      if (billing.mode === 'account') {
+        return {
+          data: {
+            configured: true,
+            billingMode: 'account',
+            keyManagementUrl: 'https://user.blockrun.ai/dashboard/keys',
+            creditsUrl: 'https://user.blockrun.ai/dashboard/credits',
+          },
+          values: {
+            walletConfigured: 'false',
+            blockrunConfigured: 'true',
+            billingMode: 'BlockRun account API',
+          },
+          text: 'BlockRun account API billing is configured. Manage keys and credits at https://user.blockrun.ai.',
+        };
+      }
+
+      if (billing.mode === 'solana') {
+        const client = new SolanaLLMClient({ privateKey: billing.privateKey, apiUrl: billing.apiUrl });
+        const address = await client.getWalletAddress();
+        return {
+          data: {
+            configured: true,
+            billingMode: 'solana',
+            address,
+            chain: 'solana',
+          },
+          values: {
+            walletConfigured: 'true',
+            blockrunConfigured: 'true',
+            billingMode: 'Solana x402',
+            walletAddress: address,
+          },
+          text: `BlockRun Solana wallet is configured. Address: ${address}. It is used for x402 USDC micropayments.`,
+        };
+      }
+
+      const privateKey = billing.privateKey;
 
       // Derive address from private key
       const account = privateKeyToAccount(privateKey as `0x${string}`);
@@ -82,6 +119,7 @@ export const blockrunWalletProvider: Provider = {
       return {
         data: {
           configured: true,
+          billingMode: 'base',
           address,
           usdcBalance: usdcBalanceRaw.toString(),
           ethBalance,
@@ -90,6 +128,8 @@ export const blockrunWalletProvider: Provider = {
         },
         values: {
           walletConfigured: 'true',
+          blockrunConfigured: 'true',
+          billingMode: 'Base x402',
           walletAddress: address,
           usdcBalance: `${usdcBalance} USDC`,
           ethBalance: `${ethBalance} ETH`,

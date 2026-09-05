@@ -1,19 +1,18 @@
 /**
  * @blockrun/elizaos-plugin
  *
- * BlockRun x402 pay-per-request AI plugin for ElizaOS.
+ * BlockRun account API and x402 pay-per-request AI plugin for ElizaOS.
  *
- * This plugin enables ElizaOS agents to make LLM API calls using the x402 protocol,
- * paying with USDC micropayments on Base chain. No API keys required - just a wallet.
+ * Configure an account API key, or pay per request with a Solana/Base wallet.
  *
  * Features:
  * - Pay-per-request AI access (OpenAI, Anthropic, Google, etc.)
- * - Automatic x402 micropayment handling
- * - USDC payments on Base chain
- * - Wallet balance provider for agent context
+ * - Account API billing with bearer authentication
+ * - Automatic x402 micropayments on Solana or Base
+ * - Billing context provider for agents
  *
  * Configuration:
- * Set BASE_CHAIN_WALLET_KEY in your agent settings or environment.
+ * Set BLOCKRUN_API_KEY, SOLANA_WALLET_KEY, or BASE_CHAIN_WALLET_KEY.
  *
  * @example
  * ```typescript
@@ -22,7 +21,7 @@
  * const agent = new Agent({
  *   plugins: [blockrunPlugin],
  *   settings: {
- *     BASE_CHAIN_WALLET_KEY: '0x...',
+ *     BLOCKRUN_API_KEY: 'brk_...',
  *   },
  * });
  * ```
@@ -38,15 +37,16 @@ import { blockrunWalletProvider } from './providers/wallet';
 // Re-export individual components
 export * from './actions';
 export * from './providers';
+export { resolveBlockRunBilling, type BlockRunBillingConfig } from './auth';
 
 /**
  * BlockRun Plugin for ElizaOS
  *
- * Enables pay-per-request AI via x402 micropayments on Base.
+ * Enables account-billed or pay-per-request AI.
  */
 export const blockrunPlugin: Plugin = {
   name: 'blockrun',
-  description: 'Pay-per-request AI via x402 micropayments on Base. Access OpenAI, Anthropic, Google, and more without API keys.',
+  description: 'AI through a BlockRun account API key or x402 USDC on Solana and Base. Access OpenAI, Anthropic, Google, and more.',
   actions: [blockrunChatAction],
   providers: [blockrunWalletProvider],
   evaluators: [],

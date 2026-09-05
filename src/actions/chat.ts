@@ -9,66 +9,90 @@ import {
   type State,
   logger,
 } from '@elizaos/core';
-import { LLMClient, type ChatOptions } from '@blockrun/llm';
+import { LLMClient, SolanaLLMClient, type ChatOptions } from '@blockrun/llm';
+import { resolveBlockRunBilling, type BlockRunBillingConfig } from '../auth';
 
 /**
- * BlockRun Chat Action - Pay-per-request AI via x402 micropayments on Base.
+ * BlockRun Chat Action - Account API or pay-per-request AI.
  *
- * This action enables ElizaOS agents to make LLM API calls using the x402 protocol,
- * paying with USDC on Base chain. Supports OpenAI, Anthropic, Google, and other models.
+ * Account billing is preferred when BLOCKRUN_API_KEY is configured. Wallet mode
+ * prefers Solana and falls back to Base.
  */
+type ChatClient = Pick<LLMClient, 'chat' | 'getWalletAddress'> | Pick<SolanaLLMClient, 'chat' | 'getWalletAddress'>;
 
-// Cache client instances per agent to avoid recreating
-const clientCache = new Map<string, LLMClient>();
+class AccountChatClient {
+  private readonly baseUrl: string;
 
-function getClient(runtime: IAgentRuntime): LLMClient {
-  const agentId = runtime.agentId;
-
-  if (clientCache.has(agentId)) {
-    return clientCache.get(agentId)!;
+  constructor(private readonly apiKey: string, apiUrl?: string) {
+    const base = (apiUrl || 'https://api.blockrun.ai').replace(/\/+$/, '').replace(/\/v1$/, '');
+    const parsed = new URL(base);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.search || parsed.hash || parsed.pathname !== "/") {
+      throw new Error('BLOCKRUN_API_BASE_URL must be a credential-free HTTPS origin.');
+    }
+    this.baseUrl = base;
   }
 
-  // Get private key from runtime settings or environment
-  const privateKey = runtime.getSetting('BASE_CHAIN_WALLET_KEY') ||
-    runtime.getSetting('BLOCKRUN_WALLET_KEY') ||
-    process.env.BASE_CHAIN_WALLET_KEY;
-
-  if (!privateKey) {
-    throw new Error(
-      'BlockRun requires a wallet private key. Set BASE_CHAIN_WALLET_KEY in agent settings or environment.'
-    );
+  async chat(model: string, prompt: string, options?: ChatOptions): Promise<string> {
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+    if (options?.system) messages.push({ role: 'system', content: options.system });
+    messages.push({ role: 'user', content: prompt });
+    const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      redirect: 'error',
+      signal: AbortSignal.timeout(120_000),
+      headers: {
+        authorization: `Bearer ${this.apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: options?.maxTokens,
+        temperature: options?.temperature,
+      }),
+    });
+    if (!response.ok) {
+      const raw = (await response.text()).split(this.apiKey).join('[REDACTED]').slice(0, 500);
+      const hint = response.status === 402 ? ' Add credits at https://user.blockrun.ai/dashboard/credits.' : '';
+      throw new Error(`BlockRun account API error ${response.status}.${hint} ${raw}`);
+    }
+    const body = await response.json().catch(() => {
+      throw new Error('BlockRun account API returned invalid JSON.');
+    }) as { choices?: Array<{ message?: { content?: string } }> };
+    const content = body.choices?.[0]?.message?.content;
+    if (typeof content !== 'string') throw new Error('BlockRun account API returned no assistant content.');
+    return content;
   }
+}
 
-  const apiUrl = runtime.getSetting('BLOCKRUN_API_URL') as string | undefined || 'https://blockrun.ai/api';
+type ResolvedChatClient = ChatClient | AccountChatClient;
 
-  const client = new LLMClient({
-    privateKey: privateKey as `0x${string}`,
-    apiUrl: apiUrl as string,
-  });
-
-  clientCache.set(agentId, client);
-  return client;
+function getClient(config: Exclude<BlockRunBillingConfig, { mode: 'none' }>): ResolvedChatClient {
+  if (config.mode === 'account') {
+    return new AccountChatClient(config.apiKey, config.apiUrl);
+  }
+  if (config.mode === 'solana') {
+    return new SolanaLLMClient({ privateKey: config.privateKey, apiUrl: config.apiUrl });
+  }
+  return new LLMClient({ privateKey: config.privateKey, apiUrl: config.apiUrl });
 }
 
 export const blockrunChatAction: Action = {
   name: 'BLOCKRUN_CHAT',
-  similes: ['BLOCKRUN_AI', 'PAY_PER_REQUEST', 'X402_CHAT', 'MICROPAY_AI'],
+  similes: ['BLOCKRUN_AI', 'ACCOUNT_API', 'PAY_PER_REQUEST', 'X402_CHAT', 'MICROPAY_AI'],
   description:
-    'Make a pay-per-request AI call using BlockRun x402 protocol. ' +
-    'Automatically handles micropayments in USDC on Base chain. ' +
+    'Call BlockRun with an account API key or automatic x402 USDC payment. ' +
+    'Wallet mode prefers Solana and falls back to Base. ' +
     'Supports multiple AI providers: OpenAI (gpt-4o, gpt-4o-mini), Anthropic (claude-sonnet-4, claude-3.5-haiku), Google (gemini-2.0-flash), and more.',
 
   validate: async (runtime: IAgentRuntime): Promise<boolean> => {
     try {
-      const privateKey = runtime.getSetting('BASE_CHAIN_WALLET_KEY') ||
-        runtime.getSetting('BLOCKRUN_WALLET_KEY') ||
-        process.env.BASE_CHAIN_WALLET_KEY;
-
-      if (!privateKey) {
+      const billing = resolveBlockRunBilling(runtime);
+      if (billing.mode === 'none') {
         logger.warn({
           src: 'plugin:blockrun:action:chat',
           agentId: runtime.agentId,
-        }, 'BlockRun wallet key not configured');
+        }, 'BlockRun credentials not configured');
         return false;
       }
 
@@ -92,7 +116,13 @@ export const blockrunChatAction: Action = {
     const startTime = Date.now();
 
     try {
-      const client = getClient(runtime);
+      const billing = resolveBlockRunBilling(runtime);
+      if (billing.mode === 'none') {
+        throw new Error(
+          'Set BLOCKRUN_API_KEY, SOLANA_WALLET_KEY, or BASE_CHAIN_WALLET_KEY. Create an account key at https://user.blockrun.ai/dashboard/keys.'
+        );
+      }
+      const client = getClient(billing);
 
       // Extract the prompt from the message
       const prompt = message.content?.text || '';
@@ -129,7 +159,7 @@ export const blockrunChatAction: Action = {
         promptLength: prompt.length,
       }, 'Making BlockRun API call');
 
-      // Make the pay-per-request call
+      // Make the account-billed or pay-per-request call.
       const response = await client.chat(model, prompt, chatOptions);
 
       const latency = Date.now() - startTime;
@@ -150,6 +180,10 @@ export const blockrunChatAction: Action = {
         });
       }
 
+      const walletAddress = billing.mode === 'account'
+        ? undefined
+        : await Promise.resolve((client as ChatClient).getWalletAddress());
+
       return {
         text: response,
         values: {
@@ -157,11 +191,13 @@ export const blockrunChatAction: Action = {
           model,
           responseLength: response.length,
           latencyMs: latency,
-          walletAddress: client.getWalletAddress(),
+          billingMode: billing.mode,
+          ...(walletAddress ? { walletAddress } : {}),
         },
         data: {
           actionName: 'BLOCKRUN_CHAT',
           model,
+          billingMode: billing.mode,
           prompt,
           response,
           latencyMs: latency,
